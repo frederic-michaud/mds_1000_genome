@@ -1,7 +1,9 @@
 from snakemake.remote.FTP import RemoteProvider
 chromosomes=range(1,23)
 populations=["CEU","YRI","LWK","TSI","JPT","CHB"]
+populations=["CHB","JPT","CEU","TSI","YRI","LWK"]
 shell.prefix("module add UHTS/Analysis/plink/1.90; ")
+remove_linkage=False
 
 all_pairs = []
 for i in range(len(populations)):
@@ -139,7 +141,7 @@ rule remove_linked_site:
 
 rule merge_bcf:
     input:
-    	expand("bcf/prunned.chr{chromosome}.bcf", chromosome = chromosomes) if True else expand("bcf/initial_bcf.chr{chromosome}.bcf", chromosome = chromosomes)
+    	expand("bcf/prunned.chr{chromosome}.bcf", chromosome = chromosomes) if remove_linkage else expand("bcf/reduce.chr{chromosome}.bcf", chromosome = chromosomes)
     output:
         "bcf/all_merged.bcf"
     shell:
@@ -234,7 +236,7 @@ rule run_medeas:
         "singularity exec --bind /scratch/local/monthly/fmichau2/ ~/python3.simg python3 ~/medeas/main.py "
         "-sf {input.med_file} " 
         "-lf {input.lab_file} "
-        "-of medeas/{wildcards.pop_pattern} "
+        "-of medeas/{wildcards.folder}/{wildcards.pop_pattern} "
         "-bws 100000 -bsn 100 "
         "> {output.log}"
         
