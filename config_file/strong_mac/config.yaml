@@ -1,0 +1,6 @@
+remove_linkage: True
+linkage_command: --indep 100 10 1.01
+populations: ["CHE","JPT","CEU","TSI","YRI","LWK"]
+mac_filter: 20    
+chromosome: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22]
+    
