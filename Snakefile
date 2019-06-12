@@ -8,14 +8,22 @@ singularity: "docker://continuumio/miniconda3"
 
 
 configfile: "config.yaml"
-remove_linkage=config["remove_linkage"]
-populations=config["populations"]
-MAC = config["mac_filter"]
-linkage_command = config["linkage_command"]
-chromosomes=config["chromosome"]
-plink_prunning = False
+
+
+populations = config["populations"] if "populations" in config.keys() else ["CEU","YRI","LWK"]
+MAC = config["MAC"] if "MAC" in config.keys() else 0
+chromosomes = config["chromosomes"] if "chromosomes" in config.keys() else [21, 22]
+
+remove_linkage = config["remove_linkage"] if "remove_linkage" in config.keys() else True
+use_plink_to_prune = config["use_plink_to_prune"] if "use_plink_to_prune" in config.keys() else True
+if use_plink_to_prune:
+	linkage_command = config["linkage_command"] if "linkage_command" in config.keys() else " --indep-pairwise 50 10 0.1"
+else:
+	reduction_factor = config["reduction_factor"] if "reduction_factor" in config.keys() else 10
+
 
 all_pairs = []
+
 for i in range(len(populations)):
 	for j in range(i+1,len(populations)):
 		all_pairs.append((populations[i],populations[j]))
@@ -126,23 +134,30 @@ rule remove_population:
         "bcftools view -S {input.pop_id} -m 1 -M 2 -v snps -O b -o {output} {input.bcf}"	
     
 
-rule get_linked_site:
+rule get_unlinked_site_plink:
     input:
         "bcf/reduce.chr{chromosome}.bcf"
     output:
         "plink/linked.chr{chromosome}.prune.in",
     params:
         "plink/linked.chr{chromosome}"
-    run:
-        if plink_prunning == True:
-            shell("plink --bcf {input} {linkage_command} --out {params} --allow-extra-chr")
-        else:
-            shell("nline=\"$(bcftools view   {input} |grep -v \"^##\" | wc -l)\";nbsnp=\"$(echo \"scale=0;$nline/100\" | bc)\";bcftools view {input} | grep -v \"^##\" | cut -f3 | shuf -n $nbsnp\ > {output}")
+    shell:
+        "plink --bcf {input} {linkage_command} --out {params} --allow-extra-chr"
+
+rule get_unlinked_site_random:
+    input:
+        "bcf/reduce.chr{chromosome}.bcf"
+    output:
+        "random_site/unlinked.chr{chromosome}.in",
+    params:
+        "plink/linked.chr{chromosome}"
+    shell:
+        "nline=\"$(bcftools view   {input} |grep -v \"^##\" | wc -l)\";nbsnp=\"$(echo \"scale=0;$nline/{reduction_factor}\" | bc)\";bcftools view {input} | grep -v \"^##\" | cut -f3 | shuf -n $nbsnp\ > {output}"
 
 rule remove_linked_site:
     input:
         bcf = "bcf/reduce.chr{chromosome}.bcf",
-        site_list = "plink/linked.chr{chromosome}.prune.in"
+        site_list = "plink/linked.chr{chromosome}.prune.in" if use_plink_to_prune == True else "random_site/unlinked.chr{chromosome}.in"
     output:
         "bcf/prunned.chr{chromosome}.bcf"
     shell:
