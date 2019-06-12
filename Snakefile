@@ -1,17 +1,24 @@
 from snakemake.remote.FTP import RemoteProvider
-chromosomes=range(1,23)
-populations=["CEU","YRI","LWK","TSI","JPT","CHB"]
-populations=["CHB","JPT","CEU","TSI","YRI","LWK"]
+
+
+
 shell.prefix("module add UHTS/Analysis/plink/1.90; ")
-remove_linkage=False
+report: "report/workflow.rst"
+singularity: "docker://continuumio/miniconda3"
+
+
+configfile: "config.yaml"
+remove_linkage=config["remove_linkage"]
+populations=config["populations"]
+MAC = config["mac_filter"]
+linkage_command = config["linkage_command"]
+chromosomes=config["chromosome"]
+plink_prunning = False
 
 all_pairs = []
 for i in range(len(populations)):
 	for j in range(i+1,len(populations)):
 		all_pairs.append((populations[i],populations[j]))
-
-
-singularity: "docker://continuumio/miniconda3"
 
 
 
@@ -33,7 +40,7 @@ rule initial_bcf:
     output:
         "bcf/initial_bcf.chr{chromosome}.bcf"
     shell:
-        "bcftools view -S ^{input.exclude} -O b -i \"MAC > 2\" {input.vcf} -o {output}"
+        "bcftools view -S ^{input.exclude} -O b -i \"MAC > {MAC} \" {input.vcf} -o {output}"
 
 
 
@@ -119,7 +126,6 @@ rule remove_population:
         "bcftools view -S {input.pop_id} -m 1 -M 2 -v snps -O b -o {output} {input.bcf}"	
     
 
-
 rule get_linked_site:
     input:
         "bcf/reduce.chr{chromosome}.bcf"
@@ -127,8 +133,11 @@ rule get_linked_site:
         "plink/linked.chr{chromosome}.prune.in",
     params:
         "plink/linked.chr{chromosome}"
-    shell:
-        "plink --bcf {input} --indep 100 10 1.01 --out {params} --allow-extra-chr"
+    run:
+        if plink_prunning == True:
+            shell("plink --bcf {input} {linkage_command} --out {params} --allow-extra-chr")
+        else:
+            shell("nline=\"$(bcftools view   {input} |grep -v \"^##\" | wc -l)\";nbsnp=\"$(echo \"scale=0;$nline/100\" | bc)\";bcftools view {input} | grep -v \"^##\" | cut -f3 | shuf -n $nbsnp\ > {output}")
 
 rule remove_linked_site:
     input:
