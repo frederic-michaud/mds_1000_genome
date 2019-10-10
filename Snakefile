@@ -23,7 +23,7 @@ for i in range(len(populations)):
 	for j in range(i+1,len(populations)):
 		all_pairs.append((populations[i],populations[j]))
 
-
+ruleorder: run_medeas_single_pop > run_medeas
 
 
 rule all:
@@ -243,7 +243,6 @@ rule make_all_pop_prunned:
         "paste -d \"\" {input} | awk '{{ for(i=1; i<=NF;i++) j+=$i; if(j < NF*2) print $0; j=0 }}' > "
         "{output}"
 
-
 rule run_medeas:
     input:
         med_file = "med/{folder}/{pop_pattern}_prunned.med",
@@ -256,5 +255,21 @@ rule run_medeas:
         "-lf {input.lab_file} "
         "-of medeas/{wildcards.folder}/{wildcards.pop_pattern} "
         "-bws 100000 -bsn 100 "
-	"--ncpus 10 "
+        "--ncpus 10 "
         "> {output.log}"
+
+rule run_medeas_single_pop:
+    input:
+        med_file = "med/single/{pop_pattern}_prunned.med",
+        lab_file = "label/single/{pop_pattern}_haplo.lab"
+    output:
+        log = "medeas/single/{pop_pattern}/{pop_pattern}.log",
+    shell:
+        "python ~/medeas/main.py "
+        "-sf {input.med_file} "
+        "-lf {input.lab_file} "
+        "-of medeas/single/{wildcards.pop_pattern} "
+        "-bws 100000 -bsn 100 "
+        "--ncpus 10 "
+        "> {output.log} "
+        "|| true"
