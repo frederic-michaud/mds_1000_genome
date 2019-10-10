@@ -1,11 +1,6 @@
 from snakemake.remote.FTP import RemoteProvider
 
-
-
-shell.prefix("module add UHTS/Analysis/plink/1.90; ")
 report: "report/workflow.rst"
-singularity: "docker://continuumio/miniconda3"
-
 
 configfile: "config.yaml"
 
@@ -35,8 +30,7 @@ rule all:
     input:
         expand("medeas/single/{pop1}/{pop1}.log",pop1 = populations),
         expand("medeas/double/{pops[0]}_{pops[1]}/{pops[0]}_{pops[1]}.log", pops = all_pairs),
-        "medeas/all/pop_all/pop_all.log",
-        "medeas/triple/JPT_CHB_YRI/JPT_CHB_YRI.log"
+        "medeas/all/pop_all/pop_all.log"
 
 
 FTP = RemoteProvider()
@@ -56,7 +50,7 @@ rule initial_bcf:
 rule build_general_panel:
     input:
         vcf=FTP.remote("ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/integrated_call_samples_v3.20130502.ALL.panel"),
-        exclude="sampleToExclude.lab"        
+        exclude="sampleToExclude.lab"
     output:
 	    "label/sample.prunned.csv"
     run:
@@ -82,9 +76,9 @@ rule build_panel_all_pop:
     input:
 	    "label/sample.prunned.csv"
     output:
-        ids = "label/all/pop_all.ids",        
+        ids = "label/all/pop_all.ids",
         lab = "label/all/pop_all.lab",
-        ids_haplo = "label/all/pop_all_haplo.ids",        
+        ids_haplo = "label/all/pop_all_haplo.ids",
         lab_haplo = "label/all/pop_all_haplo.lab"
     run:
         shell("rm -f label/pop_all.lab")
@@ -94,14 +88,14 @@ rule build_panel_all_pop:
             shell("grep  {population} {input} | awk -v population={population} '{{print population}}' >> {output.lab}"),
             shell("grep  {population} {input} | awk '{{print $1; print $1}}' >> {output.ids_haplo}"),
             shell("grep  {population} {input} | awk -v population={population} '{{print population; print population}}' >> {output.lab_haplo}")
-            
+
 rule build_panel_two_pops:
     input:
 	    p1 = "label/single/{pop1}.lab",
 	    p2 = "label/single/{pop2}.lab",
 	    p3 = "label/single/{pop1}_haplo.lab",
 	    p4 = "label/single/{pop2}_haplo.lab"
-    output:     
+    output:
         "label/double/{pop1}_{pop2}.lab",
         "label/double/{pop1}_{pop2}_haplo.lab"
     run:
@@ -116,14 +110,14 @@ rule build_panel_three_pops:
 	    p4 = "label/single/{pop1}_haplo.lab",
 	    p5 = "label/single/{pop2}_haplo.lab",
 	    p6 = "label/single/{pop3}_haplo.lab"
-    output:     
+    output:
         lab = "label/triple/{pop1}_{pop2}_{pop3}.lab",
         lab_haplo = "label/triple/{pop1}_{pop2}_{pop3}_haplo.lab"
     run:
         shell("cat {input.p1} {input.p2} {input.p3} > {output.lab}"),
         shell("cat {input.p4} {input.p5} {input.p6} > {output.lab_haplo}")
-            
-            
+
+
 rule remove_population:
     input:
         bcf="bcf/initial_bcf.chr{chromosome}.bcf",
@@ -131,8 +125,8 @@ rule remove_population:
     output:
          "bcf/reduce.chr{chromosome}.bcf"
     shell:
-        "bcftools view -S {input.pop_id} -m 1 -M 2 -v snps -O b -o {output} {input.bcf}"	
-    
+        "bcftools view -S {input.pop_id} -m 1 -M 2 -v snps -O b -o {output} {input.bcf}"
+
 
 rule get_unlinked_site_plink:
     input:
@@ -184,27 +178,27 @@ rule make_med_all_pop_sorted:
     input:
         "plink/all_population_sorted.tped"
     output:
-        "med/all_pop_sorted1.med"    
+        "med/all_pop_sorted1.med"
     shell:
         "cut -d\" \" -f 1-4 --complement {input} > {output}"
-        
+
 rule make_med_single_pop_sorted:
     input:
         med = "med/all_pop_sorted1.med",
         pop = "label/all/pop_all_haplo.lab"
     output:
-        "med/single/{population}_sorted.med"    
+        "med/single/{population}_sorted.med"
     shell:
         "pop=\"$(nl  {input.pop} | grep {wildcards.population} | awk '{{printf(\"%s,\",$1);}}')\" && "
         "pop=${{pop::-1}} && "
         "cut -d\" \" -f${{pop}} {input.med} > {output}"
-        
-        
+
+
 rule make_med_single_pop:
     input:
-        "med/single/{population}_sorted.med" 
+        "med/single/{population}_sorted.med"
     output:
-        "med/single/{population}_full.med"    
+        "med/single/{population}_full.med"
     shell:
 	    "awk 'BEGIN{{srand()}}{{for (i=0;i<NF/2;i++) if (rand() > 0.5) printf \"%s %s \", $(2*i+1) ,$(2*i+2); else printf \"%s %s \", $(2*i+2), $(2*i+1);print \"\"}}' "
 	    "{input} > "
@@ -214,9 +208,9 @@ rule make_med_single_pop:
 rule make_med_two_pop_prunned:
     input:
         pop1 = "med/single/{population1}_full.med" ,
-        pop2 = "med/single/{population2}_full.med" 
+        pop2 = "med/single/{population2}_full.med"
     output:
-        "med/double/{population1}_{population2}_prunned.med"    
+        "med/double/{population1}_{population2}_prunned.med"
     shell:
         "paste -d \"\" {input.pop1} {input.pop2} |"
         "awk '{{ for(i=1; i<=NF;i++) j+=$i; if(j < NF*2) print $0; j=0 }}'  > {output} "
@@ -225,26 +219,26 @@ rule make_med_three_pop_prunned:
     input:
         pop1 = "med/single/{population1}_full.med" ,
         pop2 = "med/single/{population2}_full.med" ,
-        pop3 = "med/single/{population3}_full.med" 
+        pop3 = "med/single/{population3}_full.med"
     output:
-        "med/triple/{population1}_{population2}_{population3}_prunned.med"    
+        "med/triple/{population1}_{population2}_{population3}_prunned.med"
     shell:
         "paste -d \"\" {input.pop1} {input.pop2} {input.pop3}  |"
         "awk '{{ for(i=1; i<=NF;i++) j+=$i; if(j < NF*2) print $0; j=0 }}'  > {output} "
-        
+
 rule make_med_single_pop_prunned:
     input:
        "med/single/{population}_full.med"
     output:
-        "med/single/{population}_prunned.med"    
+        "med/single/{population}_prunned.med"
     shell:
 	    "awk '{{ for(i=1; i<=NF;i++) j+=$i; if(j < NF*2) print $0; j=0 }}' {input} > {output}"
-	    
+
 rule make_all_pop_prunned:
     input:
        expand("med/single/{population}_full.med",population = populations)
     output:
-        "med/all/pop_all_prunned.med"    
+        "med/all/pop_all_prunned.med"
     shell:
         "paste -d \"\" {input} | awk '{{ for(i=1; i<=NF;i++) j+=$i; if(j < NF*2) print $0; j=0 }}' > "
         "{output}"
@@ -253,14 +247,14 @@ rule make_all_pop_prunned:
 rule run_medeas:
     input:
         med_file = "med/{folder}/{pop_pattern}_prunned.med",
-        lab_file = "label/{folder}/{pop_pattern}_haplo.lab"        
+        lab_file = "label/{folder}/{pop_pattern}_haplo.lab"
     output:
         log = "medeas/{folder}/{pop_pattern}/{pop_pattern}.log",
     shell:
-        "singularity exec --bind /scratch/local/monthly/fmichau2/ ~/python3.simg python3 ~/medeas/main.py "
-        "-sf {input.med_file} " 
+        "python ~/medeas/main.py "
+        "-sf {input.med_file} "
         "-lf {input.lab_file} "
         "-of medeas/{wildcards.folder}/{wildcards.pop_pattern} "
         "-bws 100000 -bsn 100 "
+	"--ncpus 10 "
         "> {output.log}"
-        
